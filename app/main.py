@@ -10,18 +10,50 @@ import sys
 # - decode_bencode(b"10:hello12345") -> b"hello12345"
 def decode_bencode(bencoded_value):
     if chr(bencoded_value[0]).isdigit():
-        first_colon_index = bencoded_value.find(b":")
-        if first_colon_index == -1:
-            raise ValueError("Invalid encoded value")
-        return bencoded_value[first_colon_index+1:]
+        return decode_bencode_str(bencoded_value)
     elif chr(bencoded_value[0]) == 'i':
-        end_index = bencoded_value.find(b"e")
-        if end_index == -1:
-            raise ValueError("incorrect format for integer")
-        return int(bencoded_value[1:end_index])
+        return decode_bencode_int(bencoded_value)
+    elif chr(bencoded_value[0]) == 'l':
+        lst, p = decode_bencode_list(bencoded_value)
+        return lst
     else:
         raise NotImplementedError("Only strings are supported at the moment")
 
+def decode_bencode_str(bencoded_value):
+    first_colon_index = bencoded_value.find(b":")
+    if first_colon_index == -1:
+        raise ValueError("Invalid encoded value")
+    return bencoded_value[first_colon_index+1:]
+
+def decode_bencode_int(bencoded_value):
+    end_index = bencoded_value.find(b"e")
+    if end_index == -1:
+        raise ValueError("incorrect format for integer")
+    return int(bencoded_value[1:end_index])
+
+def decode_bencode_list(bencoded_value):
+    decoded_list: list = []
+    i=1
+    while i <len(bencoded_value) and chr(bencoded_value[i])!='e':
+        if(chr(bencoded_value[i]).isdigit()):
+            size: int = 0
+            while(chr(bencoded_value[i]).isdigit()):
+                size = size*10 + (bencoded_value[i]-48)
+                i +=1
+            i -=1
+            decoded_str = decode_bencode_str(bencoded_value[i:i+2+size])
+            decoded_list.append(decoded_str)
+            i = i+2+size
+        elif(chr(bencoded_value[i])=='i'):
+            end_index = bencoded_value[i:].find(b"e")
+            decoded_int = decode_bencode_int(bencoded_value[i:i+1+end_index])
+            decoded_list.append(decoded_int)
+            i = i+end_index+1
+        elif(chr(bencoded_value[i])=='l'):
+            nested_list, pointer = decode_bencode_list(bencoded_value[i:])
+            decoded_list.append(nested_list)
+            i = i+ pointer+1
+    return decoded_list,i
 
 def main():
     command = sys.argv[1]
