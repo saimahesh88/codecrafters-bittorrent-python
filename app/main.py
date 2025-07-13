@@ -16,6 +16,9 @@ def decode_bencode(bencoded_value):
     elif chr(bencoded_value[0]) == 'l':
         lst, p = decode_bencode_list(bencoded_value)
         return lst
+    elif chr(bencoded_value[0]) == 'd':
+        dct,p =decode_bencoded_dict(bencoded_value)
+        return dct
     else:
         raise NotImplementedError("Only strings are supported at the moment")
 
@@ -54,6 +57,39 @@ def decode_bencode_list(bencoded_value):
             decoded_list.append(nested_list)
             i = i+ pointer+1
     return decoded_list,i
+
+def decode_bencoded_dict(bencoded_value):
+    decoded_dict: dict = {}
+    decoded_list: list = []
+    i=1
+    j=0
+    while i <len(bencoded_value) and chr(bencoded_value[i])!='e':
+        if(chr(bencoded_value[i]).isdigit()):
+            size: int = 0
+            while(chr(bencoded_value[i]).isdigit()):
+                size = size*10 + (bencoded_value[i]-48)
+                i +=1
+            i -=1
+            decoded_str = decode_bencode_str(bencoded_value[i:i+2+size])
+            decoded_list.append(decoded_str)
+            i = i+2+size
+        elif(chr(bencoded_value[i])=='i'):
+            end_index = bencoded_value[i:].find(b"e")
+            decoded_int = decode_bencode_int(bencoded_value[i:i+1+end_index])
+            decoded_list.append(decoded_int)
+            i = i+end_index+1
+        elif(chr(bencoded_value[i])=='l'):
+            lst,pointer = decode_bencode_list(bencoded_value[i:])
+            decoded_list.append(lst)
+            i = i + pointer + 1
+        elif(chr(bencoded_value[i])=='d'):
+            dt, pointer = decode_bencoded_dict(bencoded_value[i:])
+            decoded_list.append(dt)
+            i = i + pointer +1
+    while j<len(decoded_list):
+        decoded_dict[decoded_list[j].decode('utf-8')] = decoded_list[j+1]
+        j += 2
+    return decoded_dict,i
 
 def main():
     command = sys.argv[1]
