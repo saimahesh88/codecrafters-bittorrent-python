@@ -112,6 +112,18 @@ def main():
 
         # Uncomment this block to pass the first stage
         print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
+    elif command == "info":
+        torrent_file = sys.argv[2]
+        try:
+            with open(torrent_file, 'rb') as f: #open the file in binary read mode ('rb') to ensure you're reading the raw byte content 
+                bencoded_data = f.read()
+            decoded_file = decode_bencode(bencoded_data)
+            print("Tracker URL:", decoded_file["announce"].decode())
+            print("Length:", decoded_file["info"]["length"])
+        except FileNotFoundError:
+            print(f"Error: File not found at {torrent_file}")
+            raise Exception
+
     else:
         raise NotImplementedError(f"Unknown command {command}")
 
