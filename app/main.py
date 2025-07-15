@@ -94,51 +94,43 @@ def decode_bencoded_dict(bencoded_value):
         j += 2
     return decoded_dict,i
 
-def bencode_str(s):
-    length: int = len(s)
-    return str(length)+":"+s
+def bencode(data):
+    """
+    Bencodes a Python object into a byte string.
 
-def bencode_int(i):
-    return 'i'+str(i)+'e'
+    Args:
+        data: The Python object to bencode. Can be bytes, int, list, or dict.
 
-def bencode_list(l):
-    bencoded_list = 'l'
-    for item in l:
-        if type(item) == str:
-            bencoded_list+=bencode_str(item)
-        elif type(item) == int:
-            bencoded_list+=bencode_int(item)
-        elif type(item) == list:
-            bencoded_list += bencode_list(item)
-    return bencoded_list+'e'
+    Returns:
+        bytes: The bencoded representation of the data.
 
-def bencode_dict(d):
-    bencoded_dict = 'd'
-    for k in d:
-        v = d[k]
-        if k == 'name':
-            v = v.decode('utf-8')
-        elif k == 'pieces':
-            v = v.decode('latin')
-        #print(v)
-        bencoded_key = ''
-        bencoded_val = ''
-        if type(k) == str:
-            bencoded_key+=bencode_str(k)
-        elif type(k) == int:
-            bencoded_key+=bencode_int(k)
-        elif type(k) == list:
-            bencoded_key += bencode_list(k)
-        if type(v) == str:
-            bencoded_val+=bencode_str(v)
-        elif type(v) == int:
-            bencoded_val+=bencode_int(v)
-        elif type(v) == list:
-            bencoded_val += bencode_list(v)
-        elif type(v) == dict:
-            bencoded_val += bencode_dict(v)
-        bencoded_dict+=bencoded_key+bencoded_val
-    return bencoded_dict+'e'
+    Raises:
+        TypeError: If the data type is not supported.
+    """
+    if isinstance(data, bytes):
+        # Byte string: <length>:<string>
+        return str(len(data)).encode('ascii') + b':' + data
+    elif isinstance(data, int):
+        # Integer: i<integer>e
+        return b'i' + str(data).encode('ascii') + b'e'
+    elif isinstance(data, list):
+        # List: l<bencoded_element1><bencoded_element2>...e
+        encoded_elements = [bencode(item) for item in data]
+        return b'l' + b''.join(encoded_elements) + b'e'
+    elif isinstance(data, dict):
+        # Dictionary: d<bencoded_key1><bencoded_value1><bencoded_key2><bencoded_value2>...e
+        # Keys must be byte strings and sorted lexicographically
+        encoded_items = []
+        # Sort keys lexicographically (important for standard Bencoding)
+        for key in sorted(data.keys()):
+            if not isinstance(key, bytes): 
+                encoded_items.append(bencode(key.encode('ascii')))
+            else:
+                encoded_items.append(bencode(key))
+            encoded_items.append(bencode(data[key]))
+        return b'd' + b''.join(encoded_items) + b'e'
+    else:
+        raise TypeError(f"Unsupported data type for bencoding: {type(data)}")
 
 def main():
     command = sys.argv[1]
@@ -167,13 +159,15 @@ def main():
             with open(torrent_file, 'rb') as f: #open the file in binary read mode ('rb') to ensure you're reading the raw byte content 
                 bencoded_data = f.read()
             decoded_file = decode_bencode(bencoded_data)
-            bencoded_info_dict = bencode_dict(decoded_file["info"])
+            #print(decoded_file["info"])
+            bencoded_info_dict = bencode(decoded_file["info"])
             #print(str.encode(bencoded_info_dict))
             #decoded_info,sz = decode_bencoded_dict(str.encode(bencoded_info_dict))
+            #print(bencoded_info_dict)
             #print(bencoded_data)
             print("Tracker URL:", decoded_file["announce"].decode())
             print("Length:", decoded_file["info"]["length"])
-            print("Info Hash:", hashlib.sha1(str.encode(bencoded_info_dict)).hexdigest())
+            print("Info Hash:", hashlib.sha1(bencoded_info_dict).hexdigest())
         except FileNotFoundError:
             print(f"Error: File not found at {torrent_file}")
             raise Exception
