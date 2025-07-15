@@ -172,7 +172,8 @@ def main():
             print("Pieces Hashes:")
             index=0
             while index<60:
-                print(hashlib.sha1(decoded_file["info"]["pieces"][index:index+20]).hexdigest())
+                #print(decoded_file["info"]["pieces"][index:index+20])
+                print(decoded_file["info"]["pieces"][index:index+20].hex())
                 index += 20
         except FileNotFoundError:
             print(f"Error: File not found at {torrent_file}")
