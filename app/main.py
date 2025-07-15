@@ -109,10 +109,10 @@ def bencode(data):
     """
     if isinstance(data, bytes):
         # Byte string: <length>:<string>
-        return str(len(data)).encode('ascii') + b':' + data
+        return str(len(data)).encode('utf-8') + b':' + data
     elif isinstance(data, int):
         # Integer: i<integer>e
-        return b'i' + str(data).encode('ascii') + b'e'
+        return b'i' + str(data).encode('utf-8') + b'e'
     elif isinstance(data, list):
         # List: l<bencoded_element1><bencoded_element2>...e
         encoded_elements = [bencode(item) for item in data]
@@ -124,7 +124,7 @@ def bencode(data):
         # Sort keys lexicographically (important for standard Bencoding)
         for key in sorted(data.keys()):
             if not isinstance(key, bytes): 
-                encoded_items.append(bencode(key.encode('ascii')))
+                encoded_items.append(bencode(key.encode('utf-8')))
             else:
                 encoded_items.append(bencode(key))
             encoded_items.append(bencode(data[key]))
@@ -163,8 +163,8 @@ def main():
             bencoded_info_dict = bencode(decoded_file["info"])
             #print(str.encode(bencoded_info_dict))
             #decoded_info,sz = decode_bencoded_dict(str.encode(bencoded_info_dict))
-            #print(bencoded_info_dict)
-            #print(bencoded_data)
+            print(bencoded_info_dict)
+            print(bencoded_data)
             print("Tracker URL:", decoded_file["announce"].decode())
             print("Length:", decoded_file["info"]["length"])
             print("Info Hash:", hashlib.sha1(bencoded_info_dict).hexdigest())
