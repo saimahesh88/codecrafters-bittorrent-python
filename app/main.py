@@ -163,11 +163,17 @@ def main():
             bencoded_info_dict = bencode(decoded_file["info"])
             #print(str.encode(bencoded_info_dict))
             #decoded_info,sz = decode_bencoded_dict(str.encode(bencoded_info_dict))
-            print(bencoded_info_dict)
-            print(bencoded_data)
+            #print(bencoded_info_dict)
+            #print(bencoded_data)
             print("Tracker URL:", decoded_file["announce"].decode())
             print("Length:", decoded_file["info"]["length"])
             print("Info Hash:", hashlib.sha1(bencoded_info_dict).hexdigest())
+            print("Piece Length:", decoded_file["info"]["piece length"])
+            print("Pieces Hashes:")
+            index=0
+            while index<60:
+                print(hashlib.sha1(decoded_file["info"]["pieces"][index:index+20]).hexdigest())
+                index += 20
         except FileNotFoundError:
             print(f"Error: File not found at {torrent_file}")
             raise Exception
