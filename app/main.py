@@ -1,9 +1,9 @@
 import json
+import struct
 import sys
 import hashlib
-# import bencodepy - available if you need it!
-# import requests - available if you need it!
-
+import bencodepy
+import requests
 # Examples:
 #
 # - decode_bencode(b"5:hello") -> b"hello"
@@ -138,43 +138,55 @@ def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!", file=sys.stderr)
 
+    # json.dumps() can't handle bytes, but bencoded "strings" need to be
+    # bytestrings since they might contain non utf-8 characters.
+    #
+    # Let's convert them to strings for printing to the console.
+    def bytes_to_str(data):
+        if isinstance(data, bytes):
+            return data.decode()
+
+        raise TypeError(f"Type not serializable: {type(data)}")
+
     if command == "decode":
         bencoded_value = sys.argv[2].encode()
-
-        # json.dumps() can't handle bytes, but bencoded "strings" need to be
-        # bytestrings since they might contain non utf-8 characters.
-        #
-        # Let's convert them to strings for printing to the console.
-        def bytes_to_str(data):
-            if isinstance(data, bytes):
-                return data.decode()
-
-            raise TypeError(f"Type not serializable: {type(data)}")
 
         # Uncomment this block to pass the first stage
         print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
     elif command == "info":
+        file_name = sys.argv[2]
+        with open(file_name, "rb") as torrent_file:
+            content = torrent_file.read()
+        decoded_content = decode_bencode(content)
+        info_hash = hashlib.sha1(bencodepy.encode(decoded_content["info"])).hexdigest()
+        print(f'Tracker URL: {bytes_to_str(decoded_content["announce"])}')
+        print(f'Length: {decoded_content["info"]["length"]}')
+        print(f"Info Hash: {info_hash}")
+        print(f'Piece Length: {decoded_content["info"]["piece length"]}')
+        print(f"Piece Hashes: ")
+        for i in range(0, len(decoded_content["info"]["pieces"]), 20):
+            print(decoded_content["info"]["pieces"][i : i + 20].hex())
+
+    elif command== 'peers':
         torrent_file = sys.argv[2]
         try:
             with open(torrent_file, 'rb') as f: #open the file in binary read mode ('rb') to ensure you're reading the raw byte content 
                 bencoded_data = f.read()
             decoded_file = decode_bencode(bencoded_data)
-            #print(decoded_file["info"])
-            bencoded_info_dict = bencode(decoded_file["info"])
-            #print(str.encode(bencoded_info_dict))
-            #decoded_info,sz = decode_bencoded_dict(str.encode(bencoded_info_dict))
-            #print(bencoded_info_dict)
-            #print(bencoded_data)
-            print("Tracker URL:", decoded_file["announce"].decode())
-            print("Length:", decoded_file["info"]["length"])
-            print("Info Hash:", hashlib.sha1(bencoded_info_dict).hexdigest())
-            print("Piece Length:", decoded_file["info"]["piece length"])
-            print("Pieces Hashes:")
-            index=0
-            while index<60:
-                #print(decoded_file["info"]["pieces"][index:index+20])
-                print(decoded_file["info"]["pieces"][index:index+20].hex())
-                index += 20
+            tracker_url = decoded_file["announce"].decode()
+            peer_id = "abcdefghijklmnopqrst"
+            info_hash_url = hashlib.sha1(bencode(decoded_file["info"])).digest()
+            url_params = {"info_hash":info_hash_url, "peer_id":peer_id, "port":6881, "uploaded":0,"downloaded":0,"left":decoded_file["info"]["length"],"compact":1}
+            bencoded_peers_dict = requests.get(url = tracker_url, params = url_params)
+            #print(bencoded_peers_dict.content)
+            decoded_peers_dict = decode_bencode(bencoded_peers_dict.content)
+            #print(decoded_peers_dict)
+            peers = decoded_peers_dict["peers"]
+            for i in range(0, len(peers), 6):
+                ip = ".".join(str(b) for b in peers[i : i + 4])
+                port_number = struct.unpack("!H", peers[i + 4 : i + 6])[0]
+                print(f"{ip}:{port_number}")
+
         except FileNotFoundError:
             print(f"Error: File not found at {torrent_file}")
             raise Exception
