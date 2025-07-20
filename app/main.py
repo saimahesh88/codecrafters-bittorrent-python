@@ -9,7 +9,7 @@ import socket
 #
 # - decode_bencode(b"5:hello") -> b"hello"
 # - decode_bencode(b"10:hello12345") -> b"hello12345"
-peer_id = "abcdefghijklmnopqrst"
+peer_id = b"abcdefghijklmnopqrst"
 def decode_bencode(bencoded_value):
     if chr(bencoded_value[0]).isdigit():
         return decode_bencode_str(bencoded_value)
