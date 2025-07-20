@@ -4,10 +4,12 @@ import sys
 import hashlib
 import bencodepy
 import requests
+import socket
 # Examples:
 #
 # - decode_bencode(b"5:hello") -> b"hello"
 # - decode_bencode(b"10:hello12345") -> b"hello12345"
+peer_id = "abcdefghijklmnopqrst"
 def decode_bencode(bencoded_value):
     if chr(bencoded_value[0]).isdigit():
         return decode_bencode_str(bencoded_value)
@@ -132,6 +134,12 @@ def bencode(data):
     else:
         raise TypeError(f"Unsupported data type for bencoding: {type(data)}")
 
+def get_decoded_content(file_name):
+    with open(file_name, "rb") as torrent_file: ##open the file in binary read mode ('rb') to ensure you're reading the raw byte content 
+        content = torrent_file.read()
+    return decode_bencode(content)
+    
+
 def main():
     command = sys.argv[1]
 
@@ -155,9 +163,7 @@ def main():
         print(json.dumps(decode_bencode(bencoded_value), default=bytes_to_str))
     elif command == "info":
         file_name = sys.argv[2]
-        with open(file_name, "rb") as torrent_file:
-            content = torrent_file.read()
-        decoded_content = decode_bencode(content)
+        decoded_content = get_decoded_content(file_name)
         info_hash = hashlib.sha1(bencodepy.encode(decoded_content["info"])).hexdigest()
         print(f'Tracker URL: {bytes_to_str(decoded_content["announce"])}')
         print(f'Length: {decoded_content["info"]["length"]}')
@@ -170,11 +176,8 @@ def main():
     elif command== 'peers':
         torrent_file = sys.argv[2]
         try:
-            with open(torrent_file, 'rb') as f: #open the file in binary read mode ('rb') to ensure you're reading the raw byte content 
-                bencoded_data = f.read()
-            decoded_file = decode_bencode(bencoded_data)
+            decoded_file = get_decoded_content(torrent_file)
             tracker_url = decoded_file["announce"].decode()
-            peer_id = "abcdefghijklmnopqrst"
             info_hash_url = hashlib.sha1(bencode(decoded_file["info"])).digest()
             url_params = {"info_hash":info_hash_url, "peer_id":peer_id, "port":6881, "uploaded":0,"downloaded":0,"left":decoded_file["info"]["length"],"compact":1}
             bencoded_peers_dict = requests.get(url = tracker_url, params = url_params)
@@ -190,6 +193,17 @@ def main():
         except FileNotFoundError:
             print(f"Error: File not found at {torrent_file}")
             raise Exception
+
+    elif command == "handshake":
+        torrent_file = sys.argv[2]
+        decoded_file = get_decoded_content(torrent_file)
+        info_hash_url = hashlib.sha1(bencode(decoded_file["info"])).digest()
+        handshake = b"\x13BitTorrent protocol" + 8*b"\x00" + info_hash_url + peer_id
+        ip,port = sys.argv[3].split(":")
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((ip,int(port)))
+            s.send(handshake)
+            print(f"Peer ID: {s.recv(68)[48:].hex()}") #we receive the handshake in the same format we sent it which is 68 bytes long with last 20 bytes as peer_id
 
     else:
         raise NotImplementedError(f"Unknown command {command}")
